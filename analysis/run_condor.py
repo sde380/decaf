@@ -51,7 +51,7 @@ if options.cluster == 'kisti':
 Executable = run.sh
 Should_Transfer_Files = YES
 WhenToTransferOutput = ON_EXIT
-Transfer_Input_Files = run.sh, /tmp/x509up_u556950957
+Transfer_Input_Files = run.sh, /tmp/x509up_u556951362
 Output = logs/condor/run/out/$ENV(PROCESSOR)_$ENV(SAMPLE)_$(Cluster)_$(Process).stdout
 Error = logs/condor/run/err/$ENV(PROCESSOR)_$ENV(SAMPLE)_$(Cluster)_$(Process).stderr
 Log = logs/condor/run/log/$ENV(PROCESSOR)_$ENV(SAMPLE)_$(Cluster)_$(Process).log
