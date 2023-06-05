@@ -43,7 +43,7 @@ if options.cluster == 'kisti':
 Executable = fit.sh
 Should_Transfer_Files = YES
 WhenToTransferOutput = ON_EXIT
-Transfer_Input_Files = fit.sh, /tmp/x509up_u556950957
+Transfer_Input_Files = fit.sh, /tmp/x509up_u556951362
 Output = logs/condor/fit/out/$ENV(OUTFOLDER)_$(Cluster)_$(Process).stdout
 Error = logs/condor/fit/err/$ENV(OUTFOLDER)_$(Cluster)_$(Process).stderr
 Log = logs/condor/fit/log/$ENV(OUTFOLDER)_$(Cluster)_$(Process).log
