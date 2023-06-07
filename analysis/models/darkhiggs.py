@@ -189,6 +189,8 @@ def addVJetsSyst(dictionary, recoil, process, region, templ, category):
     addSyst(dictionary, recoil, process, region, templ, category, qcd1, "qcd1")
     addSyst(dictionary, recoil, process, region, templ, category, qcd2, "qcd2")
     addSyst(dictionary, recoil, process, region, templ, category, qcd3, "qcd3")
+    addSyst(dictionary, recoil, process, region, templ, category, muF, "muF")
+    addSyst(dictionary, recoil, process, region, templ, category, muR, "muR")
 
 def model(year, mass, recoil, category):
 
@@ -1256,8 +1258,8 @@ if __name__ == "__main__":
     ew3W = rl.NuisanceParameter("ew3W", "lnN")
     ew3Z = rl.NuisanceParameter("ew3Z", "lnN")
     mix = rl.NuisanceParameter("mix", "lnN")
-    #muF = rl.NuisanceParameter("muF", "lnN")
-    #muR = rl.NuisanceParameter("muR", "lnN")
+    muF = rl.NuisanceParameter("muF", "lnN")
+    muR = rl.NuisanceParameter("muR", "lnN")
     qcd1 = rl.NuisanceParameter("qcd1", "lnN")
     qcd2 = rl.NuisanceParameter("qcd2", "lnN")
     qcd3 = rl.NuisanceParameter("qcd3", "lnN")
