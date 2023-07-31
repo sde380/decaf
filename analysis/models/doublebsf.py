@@ -23,41 +23,42 @@ category_map = {
         "pass": 1,
         "fail": 0
         }
-
-bbtagger_eff = {
-        "2016": 0.938,
-        "2017": 0.947,
-        "2018": 0.945
+pt_binning = {
+        "2016": [350, 450, 500, 600, 2500],
+        "2017": [350, 450, 500, 600, 2500],
+        "2018": [350, 450, 500, 600, 2500]
         }
+labels = {
+    'QCD-$\mu$ (bb)':'bb',
+    'QCD-$\mu$ (cc)':'cc',
+    'QCD-$\mu$ (b)':'b',
+    'QCD-$\mu$ (c)':'c',
+    'QCD-$\mu$ (l)':'other',
+}
 
-binning = {
-        "2016": [-0.8, -0.4, 0.,  0.1,  0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1., 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 2.5, 3.2],
-        "2017": [-0.8, -0.4, 0.,  0.1,  0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1., 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 2.5, 3.2],
-        "2018": [-0.8, -0.4, 0.,  0.1,  0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1., 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 2.5, 3.2]
-        }
 
 ### category: pass/fail flag
-def template(dictionary, process, gentype, category, read_sumw2=False):
-    histogram = dictionary[gentype].integrate("process", process)
+def template(dictionary, process, category, pt, read_sumw2=False):
+    histogram = dictionary[process]#.integrate("process", process)
     nominal, sumw2 = histogram.values(sumw2=True)[()]
-    nominal = nominal[:, category_map[category]]
-    sumw2 = sumw2[:, category_map[category]]
+    nominal = nominal[:, pt, category_map[category]]
+    sumw2 = sumw2[:, pt, category_map[category]]
     zerobins = nominal <= 0.
     output = nominal
-    if "data" not in gentype:
+    if "data" not in process:
         output[zerobins] = 1e-5
         sumw2[zerobins] = 0.
-    binning = (dictionary[gentype].integrate("process", process).axis("svmass").edges())
+    binning = (dictionary[process].axis("svmass").edges())
     if read_sumw2:
         return (output, binning, "svmass", sumw2)
     return (output, binning, "svmass")
 
-def get_mergedMC_stat_variations(dictionary, category, mc_list):
-    templ=template(dictionary, 'QCD', mc_list[0], category, read_sumw2=True)
+def get_mergedMC_stat_variations(dictionary, category, pt, bkg_list):
+    templ=template(dictionary, bkg_list[0], category, pt, read_sumw2=True)
     merged_central=np.zeros_like(templ[0])
     merged_error2=np.zeros_like(templ[3])
-    for mc in mc_list:
-        templ=template(dictionary, 'QCD', mc, category, read_sumw2=True)
+    for bkg in bkg_list:
+        templ=template(dictionary, bkg, category, pt, read_sumw2=True)
         for i in range(len(templ[0])):
             if templ[0][i] <= 1e-5 or templ[3][i] <= 0.:
                 continue
@@ -74,15 +75,37 @@ def addBBliteSyst(templ, param, merged_central, merged_error2, epsilon=0):
         effect_up = np.ones_like(templ._nominal)
         effect_down = np.ones_like(templ._nominal)
         effect_up[i] = 1.0 + np.sqrt(merged_error2[i])/merged_central[i]
-        print('Effect up = ',effect_up[i])
         effect_down[i] = max(epsilon, 1.0 - np.sqrt(merged_error2[i])/merged_central[i])
-        print('Effect down = ', effect_down[i])
-        print('Central value',templ._nominal[i])
         templ.setParamEffect(param[i], effect_up, effect_down)
-        
-def model(year, category):
+            
+def addLumiSyst(templ, year):
+    vlumi={
+        '2016': 1.01,
+        '2017': 1.02,
+        '2018': 1.015,
+    }
+    vlumi_corr={
+        '2016': 1.006,
+        '2017': 1.009,
+        '2018': 1.02,
+    }
+    vlumi_1718={
+        '2017': 1.006,
+        '2018': 1.002,
+    }
+    templ.setParamEffect(lumi, vlumi[year])
+    templ.setParamEffect(lumi_corr, vlumi_corr[year])
+    if '2016' not in year: templ.setParamEffect(lumi_1718, vlumi_1718[year])
 
-    model_id = "svmass" + year + category
+def addPileupSyst(templ):
+    templ.setParamEffect(pu, 1.01)
+
+def addPrefiringSyst(templ, year):
+    if '2018' not in year: templ.setParamEffect(prefiring, 1.01)
+        
+def model(year, category, pt):
+
+    model_id = "svmass" + year + category + 'pt' + str(pt)
     model = rl.Model(model_id)
 
     ###
@@ -99,7 +122,7 @@ def model(year, category):
     # Add data distribution to the channel
     ###
 
-    dataTemplate = template(data, "BTagMu", "data", category)
+    dataTemplate = template(data, "data", category, pt)
     sr.setObservation(dataTemplate)
     
     ###
@@ -111,22 +134,22 @@ def model(year, category):
     for i in range(nbins):
         param[i] = rl.NuisanceParameter(ch_name + '_mcstat_bin%i' % i, combinePrior='shape')
         
-    mc_list = ['bb', 'b', 'cc', 'c', 'other']
-    total_yields, total_error2 = get_mergedMC_stat_variations(mc, category, mc_list)
+    mc_list = ['QCD-$\mu$ (bb)', 'QCD-$\mu$ (b)', 'QCD-$\mu$ (cc)', 'QCD-$\mu$ (c)', 'QCD-$\mu$ (l)']
+    total_yields, total_error2 = get_mergedMC_stat_variations(mc, category, pt, mc_list)
 
     ###
     # QCD sig process
     ###
 
     ##### Template to use bb stat uncertainties
-    sr_genbb_Template = template(mc, "QCD", "bb", category, read_sumw2=True)
+    sr_genbb_Template = template(mc, 'QCD-$\mu$ (bb)', category, pt, read_sumw2=True)
     sr_genbb = rl.TemplateSample(ch_name + "_genbb", rl.Sample.SIGNAL, sr_genbb_Template)
-    sr_genbb.setParamEffect(lumi, nlumi)
-    sr_genbb.setParamEffect(qcd_norm, 2.0)
-    sr_genbb.setParamEffect(pu, npu)
-    sr_genbb.setParamEffect(jes, njes)
-    #sr_genbb.setParamEffect(frac_bb, nfrac)
-    sr_genbb.setParamEffect(sf_weight, weight[category])
+    addLumiSyst(sr_genbb, year)
+    addPileupSyst(sr_genbb)
+    addPrefiringSyst(sr_genbb, year)
+    sr_genbb.setParamEffect(jes, 1.04)
+    sr_genbb.setParamEffect(frac_bb, 1.2)
+    sr_genbb.setParamEffect(doublebtag_weight['QCD-$\mu$ (bb)'], weight['QCD-$\mu$ (bb)'][category])
     addBBliteSyst(sr_genbb, param, total_yields, total_error2, epsilon=1e-5)
     sr.addSample(sr_genbb)
 
@@ -134,43 +157,47 @@ def model(year, category):
     # QCD bkg processes
     ###
 
-    sr_genb_Template = template(mc, "QCD", "b", category, read_sumw2=True)
+    sr_genb_Template = template(mc, 'QCD-$\mu$ (b)', category, pt, read_sumw2=True)
     sr_genb = rl.TemplateSample(ch_name + "_genb", rl.Sample.BACKGROUND, sr_genb_Template)
-    sr_genb.setParamEffect(lumi, nlumi)
-    sr_genb.setParamEffect(qcd_norm, 2.0)
-    sr_genb.setParamEffect(pu, npu)
-    sr_genb.setParamEffect(jes, njes)
-    sr_genb.setParamEffect(frac_b, nfrac)
+    addLumiSyst(sr_genb, year)
+    addPileupSyst(sr_genb)
+    addPrefiringSyst(sr_genb, year)
+    sr_genb.setParamEffect(jes, 1.04)
+    sr_genb.setParamEffect(frac_b, 1.2)
+    sr_genb.setParamEffect(doublebtag_weight['QCD-$\mu$ (b)'], weight['QCD-$\mu$ (b)'][category])
     addBBliteSyst(sr_genb, param, total_yields, total_error2, epsilon=1e-5)
     sr.addSample(sr_genb)
 
-    sr_genc_Template = template(mc, "QCD", "c", category, read_sumw2=True)
-    sr_genc = rl.TemplateSample(ch_name + "_genc", rl.Sample.BACKGROUND, sr_genc_Template)
-    sr_genc.setParamEffect(lumi, nlumi)
-    sr_genc.setParamEffect(qcd_norm, 2.0)
-    sr_genc.setParamEffect(pu, npu)
-    sr_genc.setParamEffect(jes, njes)
-    sr_genc.setParamEffect(frac_c, nfrac)
-    addBBliteSyst(sr_genc, param, total_yields, total_error2, epsilon=1e-5)
-    sr.addSample(sr_genc)
-
-    sr_gencc_Template = template(mc, "QCD", "cc", category, read_sumw2=True)
+    sr_gencc_Template = template(mc, 'QCD-$\mu$ (cc)', category, pt, read_sumw2=True)
     sr_gencc = rl.TemplateSample(ch_name + "_gencc", rl.Sample.BACKGROUND, sr_gencc_Template)
-    sr_gencc.setParamEffect(lumi, nlumi)
-    sr_gencc.setParamEffect(qcd_norm, 2.0)
-    sr_gencc.setParamEffect(pu, npu)
-    sr_gencc.setParamEffect(jes, njes)
-    sr_gencc.setParamEffect(frac_cc, nfrac)
+    addLumiSyst(sr_gencc, year)
+    addPileupSyst(sr_gencc)
+    addPrefiringSyst(sr_gencc, year)
+    sr_gencc.setParamEffect(jes, 1.04)
+    sr_gencc.setParamEffect(frac_cc, 1.2)
+    sr_gencc.setParamEffect(doublebtag_weight['QCD-$\mu$ (cc)'], weight['QCD-$\mu$ (cc)'][category])
     addBBliteSyst(sr_gencc, param, total_yields, total_error2, epsilon=1e-5)
     sr.addSample(sr_gencc)
 
-    sr_genother_Template = template(mc, "QCD", "other", category, read_sumw2=True)
+    sr_genc_Template = template(mc, 'QCD-$\mu$ (c)', category, pt, read_sumw2=True)
+    sr_genc = rl.TemplateSample(ch_name + "_genc", rl.Sample.BACKGROUND, sr_genc_Template)
+    addLumiSyst(sr_genc, year)
+    addPileupSyst(sr_genc)
+    addPrefiringSyst(sr_genc, year)
+    sr_genc.setParamEffect(jes, 1.04)
+    sr_genc.setParamEffect(frac_c, 1.2)
+    sr_genc.setParamEffect(doublebtag_weight['QCD-$\mu$ (c)'], weight['QCD-$\mu$ (c)'][category])
+    addBBliteSyst(sr_genc, param, total_yields, total_error2, epsilon=1e-5)
+    sr.addSample(sr_genc)
+
+    sr_genother_Template = template(mc, 'QCD-$\mu$ (l)', category, pt, read_sumw2=True)
     sr_genother = rl.TemplateSample(ch_name + "_genother", rl.Sample.BACKGROUND, sr_genother_Template)
-    sr_genother.setParamEffect(lumi, nlumi)
-    sr_genother.setParamEffect(qcd_norm, 2.0)
-    sr_genother.setParamEffect(pu, npu)
-    sr_genother.setParamEffect(jes, njes)
-    sr_genother.setParamEffect(frac_other, nfrac)
+    addLumiSyst(sr_genother, year)
+    addPileupSyst(sr_genother)
+    addPrefiringSyst(sr_genother, year)
+    sr_genother.setParamEffect(jes, 1.04)
+    sr_genother.setParamEffect(frac_other, 1.2)
+    sr_genother.setParamEffect(doublebtag_weight['QCD-$\mu$ (l)'], weight['QCD-$\mu$ (l)'][category])
     addBBliteSyst(sr_genother, param, total_yields, total_error2, epsilon=1e-5)
     sr.addSample(sr_genother)
 
@@ -185,76 +212,95 @@ if __name__ == "__main__":
     year = options.year
 
     ###
+    # Extract histograms from input file
+    ###
+
+    #print("Extracting histograms for", year, category)
+    hists = load("hists/doublebsf" + year + ".scaled")
+    data_hists = hists["data"]
+    if year == '2018':
+        for k in data_hists:
+                data_hists[k].scale(2.)
+    bkg_hists = hists["bkg"]
+
+
+    ###
+    # Rebin templates for fit 
+    ##
+    data_hists["template"] = data_hists["template"].rebin("fj1pt", hist.Bin("fj1pt", "fj1pt", pt_binning[year]))
+    bkg_hists["template"] = bkg_hists["template"].rebin("fj1pt", hist.Bin("fj1pt", "fj1pt", pt_binning[year]))
+
+    ###
+    # Preparing histograms for fit
+    ##
+    data = {}
+    data['data'] = data_hists["template"].integrate('process','BTagMu')
+
+    mc = {}
+    for process in bkg_hists["template"].identifiers('process'):
+        mc[str(process)] = bkg_hists["template"].integrate('process', process)
+
+    ###
     ###
     # Setting up common systematics
     ###
     ###
 
     lumi = rl.NuisanceParameter("lumi" + year, "lnN")
+    lumi_corr = rl.NuisanceParameter("lumi_corr", "lnN")
+    lumi_1718 = rl.NuisanceParameter("lumi_1718", "lnN")
     pu = rl.NuisanceParameter("pu" + year, "lnN")
+    prefiring = rl.NuisanceParameter("prefiring" + year, "lnN")
     jes = rl.NuisanceParameter("jes" + year, "lnN")
-    qcd_norm = rl.NuisanceParameter("qcd_norm", "lnN")
-
+    
     #### fractional systematics (assume 50%)
     #frac_bb = rl.NuisanceParameter("frac_bb" + year, "lnN")
 
-    ###
-    # Set lnN or shape parameters
-    ### 
+    ptbins = np.array(pt_binning[year])
+    npt = len(ptbins) - 1
+    for ptbin in range(npt):
+        print(ptbin)
 
-    nlumi = 1.027
-    npu = 1.05
-    njes = 1.02
-    nfrac = 1.5
+        frac_b = rl.NuisanceParameter("frac_b_pt" + str(ptbin) + year, "lnN")
+        frac_c = rl.NuisanceParameter("frac_c_pt" + str(ptbin) + year, "lnN")
+        frac_bb = rl.NuisanceParameter("frac_bb_pt" + str(ptbin) + year, "lnN")
+        frac_cc = rl.NuisanceParameter("frac_cc_pt" + str(ptbin) + year, "lnN")
+        frac_other = rl.NuisanceParameter("frac_other_pt" + str(ptbin) + year, "lnN")
 
-    #### SF weight (TemplateSample version) ####
-    sf = rl.IndependentParameter("sf" + year, 1.0, 0.01, 1.0 / bbtagger_eff[year])
-    weight = {
-            "pass": rl.DependentParameter("weight", "{0}", sf),
-            "fail": rl.DependentParameter("weight", "(1-({0}*%f))/(1-%f)" % (bbtagger_eff[year], bbtagger_eff[year]), sf)
+        ###
+        # Calculating efficiencies
+        ###
+
+        eff={}
+        for k in mc:
+            num=mc[k].integrate('svmass').values()[()][ptbin,1]
+            den=mc[k].integrate('svmass').sum('ZHbbvsQCD').values()[()][ptbin]
+            eff[k] = np.nan_to_num(num/den)
+            print(k,num,den)
+
+
+        #### SF weight (TemplateSample version) ####
+        sf={}
+        weight={}
+        doublebtag_weight={}
+        for k in mc:
+            sf[k] = rl.IndependentParameter("sf"+ labels[k] + year + 'pt' + str(ptbin), 1.0, 0.01, 1.0 / eff[k])
+            weight[k] = {
+                "pass": rl.DependentParameter("weight"+labels[k], "{0}", sf[k]),
+                "fail": rl.DependentParameter("weight"+labels[k], "(1-({0}*%f))/(1-%f)" % (eff[k], eff[k]), sf[k])
             }
-    sf_weight = rl.IndependentParameter("sf_weight" + year, 1.0)
+            doublebtag_weight[k] = rl.IndependentParameter("doublebtag_weight"+ labels[k] + year + 'pt' + str(ptbin), 1.0)
+        
+        for category in ["pass", "fail"]:
 
-    for category in ["pass", "fail"]:
-
-        ###
-        # Extract histograms from input file
-        ###
-
-        print("Extracting histograms for", year, category)
-        hists = load("hists/doublebsf" + year + ".scaled")
-        data_hists = hists["data"]
-        bkg_hists = hists["bkg"]
-
-        #### Setting up fractional systematics (assume 50%)
-        frac_b = rl.NuisanceParameter("frac_b" + year + category, "lnN")
-        frac_cc = rl.NuisanceParameter("frac_cc" + year + category, "lnN")
-        frac_c = rl.NuisanceParameter("frac_c" + year + category, "lnN")
-        frac_other = rl.NuisanceParameter("frac_other" + year + category, "lnN")
-
-
-        ###
-        # Rebin templates for fit 
-        ##
-        data_hists["svtemplate"] = data_hists["svtemplate"].rebin("svmass", hist.Bin("svmass", "svmass", binning[year]))
-        bkg_hists["svtemplate"] = bkg_hists["svtemplate"].rebin("svmass", hist.Bin("svmass", "svmass", binning[year]))
-
-        ###
-        # Preparing histograms for fit
-        ##
-        data = {}
-        data['data'] = data_hists["svtemplate"].sum("gentype", overflow='all')
-
-        mc = {}
-        for i in range(5):
-            mc[str(gentype_map[i])] = bkg_hists["svtemplate"].integrate("gentype", i)
-
-        with open(
-            "data/models/doublebsf-"
-            + year
-            + "-"
-            + category
-            + ".model",
-            "wb",
+                with open(
+                    "data/models/doublebsf-"
+                    + year
+                    + "-"
+                    + category
+                    + "-pt"
+                    + str(ptbin)
+                    + ".model",
+                    "wb",
         ) as fout:
-            pickle.dump(model(year, category), fout, protocol=2)
+                    pickle.dump(model(year, category, ptbin), fout, protocol=2)

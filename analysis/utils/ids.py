@@ -18,7 +18,7 @@ def isLooseElectron(pt,eta,dxy,dz,veto_id,year):
 def isTightElectron(pt,eta,dxy,dz,tight_id,year):
     mask = ~(pt==np.nan)#just a complicated way to initialize a jagged array with the needed shape to True
     if year=='2016':
-        mask = ((pt>29)&(abs(eta)<1.4442)&(abs(dxy)<0.05)&(abs(dz)<0.1)&(tight_id==4)) | ((pt>29)&(abs(eta)>1.5660)&(abs(eta)<2.5)&(abs(dxy)<0.1)&(abs(dz)<0.2)&(tight_id==4)) # Trigger: HLT_Ele27_WPTight_Gsf_v
+        mask = ((pt>40)&(abs(eta)<1.4442)&(abs(dxy)<0.05)&(abs(dz)<0.1)&(tight_id==4)) | ((pt>29)&(abs(eta)>1.5660)&(abs(eta)<2.5)&(abs(dxy)<0.1)&(abs(dz)<0.2)&(tight_id==4)) # Trigger: HLT_Ele27_WPTight_Gsf_v
     elif year=='2017':
         mask = ((pt>40)&(abs(eta)<1.4442)&(abs(dxy)<0.05)&(abs(dz)<0.1)&(tight_id==4)) | ((pt>40)&(abs(eta)>1.5660)&(abs(eta)<2.5)&(abs(dxy)<0.1)&(abs(dz)<0.2)&(tight_id==4)) # Trigger: HLT_Ele35_WPTight_Gsf_v
     elif year=='2018':
@@ -30,33 +30,44 @@ def isLooseMuon(pt,eta,iso,loose_id,year):
     #dxy and dz cuts are missing from med_id; loose isolation is 0.25
     mask = ~(pt==np.nan)#just a complicated way to initialize a jagged array with the needed shape to True
     if year=='2016':
-        mask = (pt>20)&(abs(eta)<2.4)&(loose_id>0)&(iso<0.25)
+        mask = (pt>10)&(abs(eta)<2.4)&(loose_id>0)&(iso<0.25)
     elif year=='2017':
-        mask = (pt>20)&(abs(eta)<2.4)&(loose_id>0)&(iso<0.25)
+        mask = (pt>10)&(abs(eta)<2.4)&(loose_id>0)&(iso<0.25)
     elif year=='2018':
-        mask = (pt>15)&(abs(eta)<2.4)&(loose_id>0)&(iso<0.25)
+        mask = (pt>10)&(abs(eta)<2.4)&(loose_id>0)&(iso<0.25)
     return mask
 
 def isTightMuon(pt,eta,iso,tight_id,year):
     #dxy and dz cuts are baked on tight_id; tight isolation is 0.15
     mask = ~(pt==np.nan)#just a complicated way to initialize a jagged array with the needed shape to True
     if year=='2016':
-        mask = (pt>30)&(abs(eta)<2.4)&(tight_id)&(iso<0.15)
+        mask = (pt>20)&(abs(eta)<2.4)&(tight_id)&(iso<0.15)
     elif year=='2017':
-        mask = (pt>30)&(abs(eta)<2.4)&(tight_id)&(iso<0.15)
+        mask = (pt>20)&(abs(eta)<2.4)&(tight_id)&(iso<0.15)
     elif year=='2018':
-        mask = (pt>30)&(abs(eta)<2.4)&(tight_id)&(iso<0.15)
+        mask = (pt>20)&(abs(eta)<2.4)&(tight_id)&(iso<0.15)
+    return mask
+
+def isSoftMuon(pt,eta,iso,tight_id,year):
+    #dxy and dz cuts are baked on tight_id; tight isolation is 0.15
+    mask = ~(pt==np.nan)#just a complicated way to initialize a jagged array with the needed shape to True
+    if year=='2016':
+        mask = (pt>5)&(abs(eta)<2.4)&(tight_id)&(iso>0.15)
+    elif year=='2017':
+        mask = (pt>5)&(abs(eta)<2.4)&(tight_id)&(iso>0.15)
+    elif year=='2018':
+        mask = (pt>5)&(abs(eta)<2.4)&(tight_id)&(iso>0.15)
     return mask
 
 #bitmask 1 = VVLoose, 2 = VLoose, 4 = Loose, 8 = Medium, 16 = Tight, 32 = VTight, 64 = VVTight
 def isLooseTau(pt,eta,decayMode,_id,year):
     mask = ~(pt==np.nan)#just a complicated way to initialize a jagged array with the needed shape to True
     if year=='2016':
-        mask = (pt>18)&(abs(eta)<2.3)&(decayMode)&((_id&2)==2)
+        mask = (pt>20)&(abs(eta)<2.3)&(decayMode)&((_id&2)==2)
     elif year=='2017':
-        mask = (pt>18)&(abs(eta)<2.3)&(decayMode)&((_id&2)==2)
+        mask = (pt>20)&(abs(eta)<2.3)&(decayMode)&((_id&2)==2)
     elif year=='2018':
-        mask = (pt>18)&(abs(eta)<2.3)&(decayMode)&((_id&2)==2)
+        mask = (pt>20)&(abs(eta)<2.3)&(decayMode)&((_id&2)==2)
     return mask
 
 #Photon_cutBased Int_t "cut-based spring16-V2p2 ID (0:fail, 1:loose, 2:medium, 3:tight" for 2016 NanoAOD
@@ -106,6 +117,7 @@ ids['isLooseElectron'] = isLooseElectron
 ids['isTightElectron'] = isTightElectron
 ids['isLooseMuon']     = isLooseMuon
 ids['isTightMuon']     = isTightMuon
+ids['isSoftMuon']     = isSoftMuon
 ids['isLooseTau']      = isLooseTau
 ids['isLoosePhoton']   = isLoosePhoton
 ids['isTightPhoton']   = isTightPhoton

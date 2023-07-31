@@ -56,18 +56,22 @@ request_disk = 100G
 Queue 1"""
 
 if options.cluster == 'lpc':
-    os.system('xrdcp -f ../../../../cmssw.tgz root://cmseos.fnal.gov//store/user/'+os.environ['USER']+'/cmssw.tgz')
+    if options.tar:
+        os.system('tar --exclude-caches-all --exclude-vcs -czvf ../../py2local.tgz -C ~/.local/lib/python2.7/ site-packages')
+    if options.copy:
+        os.system('xrdcp -f ../../../../cmssw.tgz root://cmseos.fnal.gov//store/user/'+os.environ['USER']+'/cmssw.tgz')
+        os.system('xrdcp -f ../../py2local.tgz root://cmseos.fnal.gov//store/user/'+os.environ['USER']+'/py2local.tgz')
     jdl = """universe = vanilla
 Executable = convert.sh
 Should_Transfer_Files = YES
 WhenToTransferOutput = ON_EXIT
-Transfer_Input_Files = convert.sh, /tmp/x509up_u556950957
+Transfer_Input_Files = convert.sh
 Output = logs/condor/convert/out/$ENV(TAG)_$(Cluster)_$(Process).stdout
 Error = logs/condor/convert/err/$ENV(TAG)_$(Cluster)_$(Process).stderr
 Log = logs/condor/convert/log/$ENV(TAG)_$(Cluster)_$(Process).log
 TransferOutputRemaps = "outfile.root=$ENV(PWD)/$ENV(OUTFILE)"
 Arguments = $ENV(DATACARD) $ENV(OUTFILE) $ENV(MAPS) $ENV(CLUSTER) $ENV(USER)
-request_memory = 8000
+request_memory = 32000
 Queue 1"""
 
 jdl_file = open("convert.submit", "w") 

@@ -397,9 +397,9 @@ class BTagCorrector:
         filename = 'data/'+files[tagger][year]
         self.sf = BTagScaleFactor(filename, workingpoint)
         files = {
-            '2016': 'btag2016.merged',
-            '2017': 'btag2017.merged',
-            '2018': 'btag2018.merged',
+            '2016': 'btageff2016.merged',
+            '2017': 'btageff2017.merged',
+            '2018': 'btageff2018.merged',
         }
         filename = 'hists/'+files[year]
         btag = load(filename)
@@ -472,6 +472,85 @@ get_btag_weight = {
     }
 }
 
+class DoubleBTagCorrector:
+
+    def __init__(self, year):
+        self._year = year
+        sf = {
+            '2018': {
+                'value': np.array([1.0037e+00,1.0037e+00,7.3346e-01,6.9716e-01,1.1972e+00]),
+                'unc': np.array([2*6.72e-02,6.72e-02,6.98e-02,7.06e-02,1.06e-01]),
+                'edges': np.array([160, 350, 450, 500, 2500])
+            },
+            '2017': {
+                'value': np.array([9.9331e-01,9.9331e-01,9.3711e-01,9.5658e-01,8.3033e-01]),
+                'unc': np.array([2*3.96e-02,3.96e-02,5.05e-02,4.63e-02,4.61e-02]),
+                'edges': np.array([160, 350, 450, 500, 2500])
+            },
+            '2016': {
+                'value': np.array([8.8300e-01,8.8300e-01,1.0384e+00,8.0800e-01,7.1766e-01]),
+                'unc': np.array([2*4.46e-02,4.46e-02,8.21e-02,9.48e-02,1.48e-01]),
+                'edges': np.array([160, 350, 450, 500, 2500])
+            },
+        }
+        self.sf_nom={}
+        self.sf_up={} 
+        self.sf_down={}
+        
+        for i in range(len(sf[year]['value'])):
+            
+            nom = np.ones_like(sf[year]['value'])
+            nom[i] = sf[year]['value'][i]
+            unc = np.zeros_like(sf[year]['value'])
+            unc[i] = sf[year]['unc'][i]
+            print(i,nom)
+            self.sf_nom['Pt'+str(i)] = lookup_tools.dense_lookup.dense_lookup(nom, sf[year]['edges'])
+            self.sf_up['Pt'+str(i)] = lookup_tools.dense_lookup.dense_lookup(nom+unc, sf[year]['edges'])
+            self.sf_down['Pt'+str(i)] = lookup_tools.dense_lookup.dense_lookup(nom-unc, sf[year]['edges'])
+        
+
+    def doublebtag_weight(self, pt):
+        sf_nom={} 
+        sf_up={} 
+        sf_down={}
+        for k in self.sf_nom:
+            sf_nom[k], sf_up[k], sf_down[k] = self.sf_nom[k](pt), self.sf_up[k](pt), self.sf_down[k](pt)
+        return sf_nom, sf_up, sf_down
+
+get_doublebtag_weight = {
+    '2016': DoubleBTagCorrector('2016').doublebtag_weight,
+    '2017': DoubleBTagCorrector('2017').doublebtag_weight,
+    '2018': DoubleBTagCorrector('2018').doublebtag_weight,
+}
+
+class Reweighting:
+
+    def __init__(self, year):
+        self._year = year
+        files = {
+            '2016': 'reweighting2016.scaled',
+            '2017': 'reweighting2017.scaled',
+            '2018': 'reweighting2018.scaled',
+        }
+        filename = 'hists/'+files[year]
+        reweighting = load(filename)
+        hists = load(filename)
+        if year == '2018':
+            hists['data']['reweighting'].scale(2.)
+        num=hists['data']['reweighting'].integrate('process').values()[()]
+        den=hists['bkg']['reweighting'].integrate('process').values()[()]
+        reweighting = num / np.maximum(den, 1.)
+        self.reweighting = lookup_tools.dense_lookup.dense_lookup(reweighting, [ax.edges() for ax in hists['data']['reweighting'].axes()[1:]])
+
+    def weight(self, tau21, pt, eta):
+        weight = self.reweighting(tau21, pt, eta)
+        return weight
+
+get_reweighting = {
+    '2016': Reweighting('2016').weight,
+    '2017': Reweighting('2017').weight,
+    '2018': Reweighting('2018').weight,
+}
 '''
 Jetext = extractor()
 for directory in ['jec', 'jersf', 'jr', 'junc']:
@@ -511,6 +590,8 @@ corrections = {
     'get_mu_loose_iso_sf':      get_mu_loose_iso_sf,
     'get_ecal_bad_calib':       get_ecal_bad_calib,
     'get_btag_weight':          get_btag_weight,
+    'get_doublebtag_weight':    get_doublebtag_weight,
+    'get_reweighting':          get_reweighting,
     #'Jetevaluator':             Jetevaluator,
 }
 save(corrections, 'data/corrections.coffea')
