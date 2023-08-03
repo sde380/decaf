@@ -1,20 +1,20 @@
 #!/usr/bin/env python
-import lz4.frame as lz4f
-import cloudpickle
+import lz4.frame as lz4f #S: A package used for compression/decompression of files known for its speed (rather than losslessness).
+import cloudpickle #S: Pickling is a form of turning an object from a class into a byte stream (list of information). Unpickling is the reverse, and this package is a package that extends what can be pickled from the usual.
 import json
-import pprint
-import copy
+import pprint #S: A package that allows for printing in a more human-readable format.
+import copy #S: Allows for the copying of objects, whether that be a shallow copy that copies only the structure of the object (references), or a deep copy where the references actually point to different locations.
 import numpy as np
 import math
 import awkward
-np.seterr(divide='ignore', invalid='ignore', over='ignore')
+np.seterr(divide='ignore', invalid='ignore', over='ignore') #S: Stands for "seterror". This is saying that for divide by zero, invalid type, or overflow errors, they will be ignored and continue as usual, although "NaN" or "INF" type stuff may occur.
 from coffea.arrays import Initialize
-from coffea import hist, processor
+from coffea import hist, processor #S: A processor is an algorithm used to calculate a certain quantity.
 from coffea.util import load, save
-from optparse import OptionParser
+from optparse import OptionParser #S: Allows you to add option parsers more easily or something.
 from uproot_methods import TVector2Array, TLorentzVectorArray
 
-class AnalysisProcessor(processor.ProcessorABC):
+class AnalysisProcessor(processor.ProcessorABC): #S: Question:
 
     lumis = { #Values from https://twiki.cern.ch/twiki/bin/viewauth/CMS/PdmVAnalysisSummaryTable                                                      
         '2016': 36.31,
@@ -22,7 +22,7 @@ class AnalysisProcessor(processor.ProcessorABC):
         '2018': 59.74
     }
 
-    met_filter_flags = {
+    met_filter_flags = { #S: Flags used for each year, as outlined in table 4 in section 4.2 of the SF Note.
         '2016': ['goodVertices',
                  'globalSuperTightHalo2016Filter',
                  'HBHENoiseFilter',
@@ -52,7 +52,7 @@ class AnalysisProcessor(processor.ProcessorABC):
 
         self._year = year
         self._lumi = 1000.*float(AnalysisProcessor.lumis[year])
-        self._xsec = xsec
+        self._xsec = xsec #S: Question: Not sure about what this is.
 
         self._gentype_map = {
             'bb':       0,
@@ -63,7 +63,7 @@ class AnalysisProcessor(processor.ProcessorABC):
             'hs':       5,
         }
 
-        self._ZHbbvsQCDwp = {
+        self._ZHbbvsQCDwp = { #S: Question: This is probably working point, but there are three working points? I thought that there was just one.
             '2016': 0.53,
             '2017': 0.61,
             '2018': 0.65
@@ -93,7 +93,7 @@ class AnalysisProcessor(processor.ProcessorABC):
         self._ids = ids
         self._common = common
 
-        self._accumulator = processor.dict_accumulator({
+        self._accumulator = processor.dict_accumulator({ #S: Seems like a dictionary of histograms is being created. This line creates an accumulator, which is a accumlation of results.
             'sumw': hist.Hist(
                 'sumw',
                 hist.Cat('dataset', 'Dataset'),
@@ -141,13 +141,13 @@ class AnalysisProcessor(processor.ProcessorABC):
     def columns(self):
         return self._columns
 
-    def process(self, events):
+    def process(self, events): #S: A process takes in events, presumably some sort of array of events.
 
-        dataset = events.metadata['dataset']
+        dataset = events.metadata['dataset'] #S: Seems that these events typically have some structure.
 
-        isData = 'genWeight' not in events.columns
-        selection = processor.PackedSelection()
-        hout = self.accumulator.identity()
+        isData = 'genWeight' not in events.columns #S: The variable isData is being assigned a boolean variable based on whether or not 'genWeight' is a column.
+        selection = processor.PackedSelection() #S: PackedSelection allows us to make cuts on the dataset easily. Here, selection is an object that can make selections.
+        hout = self.accumulator.identity() #S: A copy of the accumulator is assigned to the variable hout.
 
         ###
         #Getting ids from .coffea files
