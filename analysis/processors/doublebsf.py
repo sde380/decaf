@@ -171,13 +171,13 @@ class AnalysisProcessor(processor.ProcessorABC): #S: Question:
         mu_soft=mu[mu.issoft.astype(np.bool)] #S: Seems like this stories this information somewhere.
 
         j = events.Jet
-        j['isHEM'] = isHEMJet(j.pt, j.eta, j.phi) #S: Question: what is HEM?
+        j['isHEM'] = isHEMJet(j.pt, j.eta, j.phi) #S: Question: what is HEM? Answer, it's about that problem in 2018 that causes a huge spike of data where the cells are off. Remove jets in this region in MC
         j_HEM = j[j.isHEM.astype(np.bool)]
         j_nHEM = j_HEM.counts
 
         fj = events.AK15Puppi #S: Probably stands for fatjet
         fj['sd'] = fj.subjets.sum()
-        fj['isgood'] = isGoodFatJet(fj.sd.pt, fj.sd.eta, fj.jetId) #S: Question: What makes a jet good?
+        fj['isgood'] = isGoodFatJet(fj.sd.pt, fj.sd.eta, fj.jetId) #S: Question: What makes a jet good? Answer, certain flags that can be found in the ids. Trace the origin.
         fj['T'] = TVector2Array.from_polar(fj.pt, fj.phi)
         fj['msd_raw'] = (fj.subjets * (1 - fj.subjets.rawFactor)).sum().mass
         fj['msd_corr'] = fj.msd_raw * awkward.JaggedArray.fromoffsets(fj.array.offsets, np.maximum(1e-5, get_msd_weight(fj.sd.pt.flatten(),fj.sd.eta.flatten())))
