@@ -153,10 +153,10 @@ class AnalysisProcessor(processor.ProcessorABC): #S: Question:
         #Getting ids from .coffea files
         ###
 
-        get_msd_weight  = self._corrections['get_msd_weight']
-        get_pu_weight   = self._corrections['get_pu_weight'][self._year]  
+        get_msd_weight  = self._corrections['get_msd_weight'] #S: Probably stands for mass soft-drop weight. These are from the corrections, which makes sense since soft-drop mass is a correction.
+        get_pu_weight   = self._corrections['get_pu_weight'][self._year]  #S: Probably pile-up.
         get_reweighting = self._corrections['get_reweighting'][self._year]
-        isSoftMuon      = self._ids['isSoftMuon']
+        isSoftMuon      = self._ids['isSoftMuon'] #S: These three seems to be functions that return booleans, which are being taken from the ids.
         isGoodFatJet    = self._ids['isGoodFatJet']
         isHEMJet        = self._ids['isHEMJet']  
 
@@ -167,23 +167,23 @@ class AnalysisProcessor(processor.ProcessorABC): #S: Question:
         ###
 
         mu = events.Muon
-        mu['issoft'] = isSoftMuon(mu.pt,mu.eta,mu.pfRelIso04_all,mu.looseId,self._year)
-        mu_soft=mu[mu.issoft.astype(np.bool)]
+        mu['issoft'] = isSoftMuon(mu.pt,mu.eta,mu.pfRelIso04_all,mu.looseId,self._year) #S: Seems like these are column-based operations that flag muons as soft or not.
+        mu_soft=mu[mu.issoft.astype(np.bool)] #S: Seems like this stories this information somewhere.
 
         j = events.Jet
-        j['isHEM'] = isHEMJet(j.pt, j.eta, j.phi)
+        j['isHEM'] = isHEMJet(j.pt, j.eta, j.phi) #S: Question: what is HEM?
         j_HEM = j[j.isHEM.astype(np.bool)]
         j_nHEM = j_HEM.counts
 
-        fj = events.AK15Puppi
+        fj = events.AK15Puppi #S: Probably stands for fatjet
         fj['sd'] = fj.subjets.sum()
-        fj['isgood'] = isGoodFatJet(fj.sd.pt, fj.sd.eta, fj.jetId)
+        fj['isgood'] = isGoodFatJet(fj.sd.pt, fj.sd.eta, fj.jetId) #S: Question: What makes a jet good?
         fj['T'] = TVector2Array.from_polar(fj.pt, fj.phi)
         fj['msd_raw'] = (fj.subjets * (1 - fj.subjets.rawFactor)).sum().mass
         fj['msd_corr'] = fj.msd_raw * awkward.JaggedArray.fromoffsets(fj.array.offsets, np.maximum(1e-5, get_msd_weight(fj.sd.pt.flatten(),fj.sd.eta.flatten())))
-        probQCD=fj.probQCDbb+fj.probQCDcc+fj.probQCDb+fj.probQCDc+fj.probQCDothers
+        probQCD=fj.probQCDbb+fj.probQCDcc+fj.probQCDb+fj.probQCDc+fj.probQCDothers #S: Seems like the probability of an event to be a QCD event.
         probZHbb=fj.probZbb+fj.probHbb
-        fj['ZHbbvsQCD'] = probZHbb/(probZHbb+probQCD)
+        fj['ZHbbvsQCD'] = probZHbb/(probZHbb+probQCD) #S: Ratio of probabilities
         fj['tau21'] = fj.tau2/fj.tau1
         jetmu = fj.subjets.flatten(axis=1).cross(mu_soft, nested=True)
         mask = (mu.counts>0) & ((jetmu.i0.delta_r(jetmu.i1) < 0.4).astype(np.int).sum() > 0)
@@ -193,7 +193,7 @@ class AnalysisProcessor(processor.ProcessorABC): #S: Question:
         step3 = awkward.JaggedArray.fromoffsets(fj.subjets.offsets, step2)
         #fj['withmu'] = (step3.astype(np.int).sum() > 1)
         jetmu = fj.sd.cross(mu_soft, nested=True)
-        fj['withmu'] = (mu_soft.counts>0) & ((jetmu.i0.delta_r(jetmu.i1) < 1.5).astype(np.int).sum()>0)
+        fj['withmu'] = (mu_soft.counts>0) & ((jetmu.i0.delta_r(jetmu.i1) < 1.5).astype(np.int).sum()>0) #S: Seems like it tags on if a jet has a muon.
         fj_good = fj[fj.isgood.astype(np.bool)]
         fj_withmu = fj_good[fj_good.withmu.astype(np.bool)]
         fj_ngood = fj_good.counts
@@ -206,7 +206,7 @@ class AnalysisProcessor(processor.ProcessorABC): #S: Question:
         ###
         # Calculating weights
         ###
-        if not isData:
+        if not isData: #S: The isData variable is true if there is a "genWeights" column, false otherwise.
 
             gen = events.GenPart
 
@@ -395,7 +395,7 @@ class AnalysisProcessor(processor.ProcessorABC): #S: Question:
                            weight=weight*cut)
                     
         isFilled = False
-        if isData:
+        if isData: #S: This is for if there is genWeights.
             if not isFilled:
                 hout['sumw'].fill(dataset=dataset, sumw=1, weight=1)
                 isFilled=True
@@ -409,7 +409,7 @@ class AnalysisProcessor(processor.ProcessorABC): #S: Question:
                                     ZHbbvsQCD=leading_fj.ZHbbvsQCD.sum(),
                                     weight=np.ones(events.size)*cut)
             fill(dataset, np.ones(events.size), selection)
-        else:
+        else: #S: If there isn't genWeights, seems like it is perhaps creating the weights.
             weights = processor.Weights(len(events))
             if 'L1PreFiringWeight' in events.columns: weights.add('prefiring',events.L1PreFiringWeight.Nom)
             weights.add('genw',events.genWeight)
